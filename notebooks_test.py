@@ -8,7 +8,9 @@ import pandas as pd
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
 # Data importation
-X, y = pd.read_csv("ref_train_x.csv"), pd.read_csv("ref_train_y.csv", header=None)
+X, y = pd.read_csv("data/ref_train_x.csv"), pd.read_csv(
+    "data/ref_train_y.csv", header=None
+)
 X.head()
 X.drop("raw_id", axis=1, inplace=True)
 # Testing
