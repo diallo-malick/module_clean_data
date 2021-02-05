@@ -2,6 +2,56 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.preprocessing import OrdinalEncoder
 import pandas as pd
+import numpy as np
+
+
+class TreeFeature:
+    def __init__(self, cols=None, tree_model=None, keep_cols=False):
+        self.cols = cols
+        self.keep_cols = keep_cols
+        self.tree_model = tree_model
+        self.ohe = OneHotEncoder()
+
+    def fit(self, X, y):
+        n = X.shape[0]
+        ind = np.arange(n)
+        np.random.shuffle(ind)
+        ind = ind[: int(0.3 * n)]
+        X = X.iloc[ind, :]
+        y = y[ind]
+
+        if self.cols is None:
+            self.cols = X.columns
+
+        self.tree_model.fit(X[self.cols], y)
+        tree_feature = self.tree_model.apply(X[self.cols])
+        if tree_feature.ndim > 2:
+            tree_feature = tree_feature[:, :, 0]
+        self.ohe.fit(tree_feature)
+
+    def transform(self, X, **kwargs):
+
+        tree_feature = self.tree_model.apply(X[self.cols])
+        if tree_feature.ndim > 2:
+            tree_feature = tree_feature[:, :, 0]
+
+        tree_feature = self.ohe.transform(tree_feature)
+
+        tree_cols = [f"tree_feature_{i}" for i in range(tree_feature.shape[1])]
+
+        tree_feature = tree_feature.toarray()
+        tree_feature = pd.DataFrame(tree_feature, columns=tree_cols)
+
+        if self.keep_cols:
+            cols_to_keep = list(X.columns) + tree_cols
+        else:
+            cols_to_keep = [
+                col for col in X.columns if col not in self.cols
+            ] + tree_cols
+
+        X_tr = pd.concat([X.reset_index(drop=True), tree_feature], axis=1)
+
+        return X_tr[cols_to_keep]
 
 
 def polynomial_feature_name(data, cols, d=2, interaction_only=True):
@@ -102,7 +152,7 @@ class ComposeTransforms:
         new_X = X.copy()
 
         for transform in self.transforms:
-            transform.fit(new_X)
+            transform.fit(new_X, y)
             new_X = transform.transform(new_X, **kwargs)
 
     def transform(self, X, **kwargs):

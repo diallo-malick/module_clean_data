@@ -11,7 +11,7 @@ import pandas as pd
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
 # Data importation
-X, y = pd.read_csv("ref_train_x.csv"), pd.read_csv("ref_train_y.csv", header=None)
+X, y = pd.read_csv("data/ref_train_x.csv"), pd.read_csv("data/ref_train_y.csv", header=None)
 X.head()
 X.drop("raw_id", axis=1, inplace=True)
 
@@ -42,10 +42,29 @@ l_trans = [
     One_Hot_Encoder(["exchange"]),
 ]
 
+from sklearn.ensemble import RandomForestClassifier
+
+rd_clf = RandomForestClassifier(n_estimators=10)
+
+new_trans = [
+    ImputeWithMean(cols_with_nan),
+    TreeFeature(cols=cols_with_nan, tree_model=rd_clf),
+    One_Hot_Encoder(["exchange"])
+]
+
+new_tr = ComposeTransforms(new_trans)
+new_tr.fit(X=X, y=y.values)
+a = new_tr.transform(X)
+a.head()
 tr = ComposeTransforms(l_trans)
-
+tr.fit(X)
+tr.transform(X)
+# Evaluation de rnd forest
+get_split_loader = get_split_loader_func(3, X)
+evaluate([clf_log], [new_tr], X, y, get_split_loader)
+y.shape, X.shape
 from sklearn.linear_model import LogisticRegression
-
+type(y)
 # from sklearn.svm import SVC
 
 from sklearn.ensemble import BaggingClassifier
@@ -58,33 +77,10 @@ models = [clf_bag, clf_log]
 
 get_split_loader = get_split_loader_func(3, X)
 
-evaluate(models, [tr], X, y, get_split_loader)
+#evaluate(models, [tr], X, y, get_split_loader)
 
 from sklearn.preprocessing import power_transform
 
-class TurnToNormDist:
-    """
-    La classe qui permet de transformer les variables pour qu'elles 
-    suivent une loie normale
-    --------
-    Ex: normal_distrib = TurnToNormDist(cols)
-        normal_distrib.fit(X)
-        normal_distrib.transform(X)
-
-    """
-    def __init__(self, cols=None):
-        self.cols = cols
-    
-    def fit(self, X, y=None):
-        pass
-
-    def transform(self, X, **kwargs):
-
-        data = X.copy()
-        for col in self.cols:
-            data[col] = power_transform(data[[col]])
-
-        return data 
     
 nor_dis = TurnToNormDist(cols_with_nan)
 
@@ -94,3 +90,18 @@ power_transform(X[["sector"]])
 X.head()
 import seaborn as sns
 sns.distplot( new_X["return_1w"])
+
+def select_feat_by_corr(X, y, threshold=0.09):
+    y.columns = ["Target"]
+    data = pd.concat([X,y], axis=1)
+    _corr = data.corr()[["Target"]].sort_values("Target")
+    feat_to_drop=list(_corr[(_corr["Target"]< threshold)& (_corr["Target"]>-threshold)].index)
+    #X.drop(feat_to_drop,axis=1,inplace=True)
+    return feat_to_drop, _corr
+
+corr_cols, a = select_feat_by_corr(X, y, 0.2)
+a
+pd.concat([X,y], axis=1)
+y[0]
+y.columns = ["Target"]
+len(corr_cols)

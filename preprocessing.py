@@ -99,15 +99,15 @@ class ImputeOutOfRange:
         else:
             self.unk = {col: UNK_TOKEN for col in cols}
 
-        def transform(self, X: pd.DataFrame, **kwargs):
-            X = X.copy()
-            X.fillna(value=self.unk, inplace=True)
-            return X
+    def transform(self, X: pd.DataFrame, **kwargs):
+        X = X.copy()
+        X.fillna(value=self.unk, inplace=True)
+        return X
 
-        def get_out_of_range(self, col_values):
-            a = col_values.min()
-            nb_chiffre = 1 + int(np.log10(a))
-            return int((nb_chiffre + 1) * "1") * 9
+    def get_out_of_range(self, col_values):
+        a = col_values.min()
+        nb_chiffre = 1 + int(np.log10(a))
+        return int((nb_chiffre + 1) * "1") * 9
 
 
 class Imputers:
@@ -241,3 +241,14 @@ class TurnToNormDist:
             data[col] = power_transform(data[[col]])
 
         return data
+
+
+def select_feat_by_corr(X, y, threshold=0.09):
+    y.columns = ["Target"]
+    data = pd.concat([X, y], axis=1)
+    _corr = data.corr()[["Target"]].sort_values("Target")
+    feat_to_drop = list(
+        _corr[(_corr["Target"] < threshold) & (_corr["Target"] > -threshold)].index
+    )
+    # X.drop(feat_to_drop,axis=1,inplace=True)
+    return feat_to_drop, _corr

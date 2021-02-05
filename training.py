@@ -1,4 +1,6 @@
 # training.py
+import os
+import time
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold
@@ -25,26 +27,11 @@ evaluate([lreg, bgg], [tr], X, data_y, split_loader)
 """
 
 
-def transform_loader(ll_transforms):
-    """
-    [ [imputWithMean, inputWithMedian] ,
-      [OneHot, Ordianal ]
-      [polynomial(d=5), polynomial(d=2), None]
-      [maxnom, stdnorm]
-    ]
-    """
-    if len(ll_transforms) == 1:
-        return [[transform] for transform in ll_transforms[0]]
-
-    next_ = transform_loader(ll_transforms[1:])
-
-    list_transforms = []
-
-    for layer in ll_transforms:
-
-        for transform in layer:
-            if transform is None:
-                continue
+def mkdir_if_not_exist(path):  # @save
+    if not isinstance(path, str):
+        path = os.path.join(*path)
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 
 def get_stratified_split(n_splits, X, y, shuffle=False):
@@ -74,19 +61,32 @@ def get_split_loader_func(n_splits, X, y=None, shuffle=False):
     return lambda: get_stratified_split(n_splits, X, y, shuffle=shuffle)
 
 
-def evaluate(models, transforms, data_X, data_y, get_split_loader):
+def evaluate(models, transforms, data_X, data_y, get_split_loader, log_dir="Results"):
     """
     get_split_loader = get_split_loader_func(5, data_X)
     """
+    t = int(time.time())
+    log_file = f"{log_dir}/results_{t}.csv"
+
+    mkdir_if_not_exist(log_dir)
+
     scores_df = []
     for model in models:
         for transform in transforms:
+            start_time = time.time()
+
             split_loader = get_split_loader()
             scores, scores_tmp = cross_valide(
                 model, data_X, data_y, transform, split_loader
             )
+            # scores = cross_valide(model, data_X, data_y, transform, split_loader)
             scores["pipeline"] = {"model": model, "transform": transform}
+
+            scores["time (min.)"] = int(time.time() - start_time) // 60
+
             scores_df.append(scores)
+
+            pd.DataFrame(scores_df).to_csv(log_file, index=False)
 
     return pd.DataFrame(scores_df)
 
@@ -126,7 +126,7 @@ def cross_valide(model, dataX, datay, transform, split_loader):
 
         ### Fitting
 
-        transform.fit(X_train)
+        transform.fit(X_train, y_train)
         X_train = transform.transform(X_train, is_training=True)
         X_val = transform.transform(X_val)
 
